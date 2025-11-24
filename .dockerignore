@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Large files (already mounted as volumes)
+# videos/
+# weights/
+# analysis/
+# detections/
+
+# Temporary files
+*.log
+*.tmp
+tempCodeRunnerFile.py
+test
+
+# Documentation
+*.md
+!Readme.md
+
+# Kubernetes
+kubernetes/

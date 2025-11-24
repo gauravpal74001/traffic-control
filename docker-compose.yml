@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  sangya:
+    build: 
+      context: .
+      dockerfile: Dockerfile.optimized
+    container_name: sadak-traffic-analysis
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount videos directory for video files
+      - ./videos:/app/videos:ro
+      # Mount weights directory (read-only for model weights)
+      - ./weights:/app/weights:ro
+      # Mount configure directory for zone configurations
+      - ./configure:/app/configure:ro
+      # Mount analysis directory for output (read-write for results)
+      - ./analysis:/app/analysis
+      # Mount detections directory for detection data (read-write)
+      - ./detections:/app/detections
+      # Mount images directory
+      - ./images:/app/images:ro
+      # Mount assets directory
+      - ./assets:/app/assets:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import socket; s=socket.socket(); s.connect((\"localhost\", 8080)); s.close()' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

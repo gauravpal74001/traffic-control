@@ -1,0 +1,59 @@
+# Optimized Dockerfile with progress indicators
+FROM python:3.10
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies including ffmpeg (usually takes 2-5 minutes)
+RUN echo "=== Installing system dependencies ===" && \
+    apt-get update && apt-get install -y --quiet \
+    libgl1-mesa-dev \
+    libglib2.0-0 \
+    libx11-dev \
+    libxrender-dev \
+    libsm6 \
+    libxext6 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/* && \
+    echo "=== System dependencies installed ==="
+
+# Upgrade pip with progress
+RUN echo "=== Upgrading pip ===" && \
+    pip3 install --upgrade --quiet "pip>=24.0,<24.1" setuptools wheel && \
+    echo "=== Pip upgraded ==="
+
+# Copy requirements.txt
+COPY requirements.txt .
+
+# Install PyTorch CPU version FIRST (LONGEST STEP - ~5-15 minutes, ~600MB download)
+# Installing before other packages to avoid dependency conflicts
+RUN echo "=== Installing PyTorch CPU (this will take 5-15 minutes, downloading ~600MB) ===" && \
+    pip3 install --no-cache-dir --progress-bar=off --default-timeout=1000 \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    echo "=== PyTorch installed ==="
+
+# Install remaining packages with progress (usually takes 10-30 minutes)
+# Note: AWS packages and torch/torchvision are already in requirements.txt
+RUN echo "=== Installing remaining packages from requirements.txt ===" && \
+    pip3 install --no-cache-dir --progress-bar=off --default-timeout=1000 -r requirements.txt && \
+    echo "=== All packages installed ==="
+
+# Install streamlit_login_auth_ui
+RUN echo "=== Installing streamlit_login_auth_ui ===" && \
+    pip3 install --no-cache-dir --quiet streamlit_login_auth_ui && \
+    echo "=== streamlit_login_auth_ui installed ==="
+
+# Copy application code
+COPY . .
+
+# Expose port 8080
+EXPOSE 8080
+
+# Command to run Streamlit app
+CMD ["streamlit", "run", "app.py", \
+     "--server.enableCORS", "false", \
+     "--server.headless", "true", \
+     "--browser.serverAddress", "0.0.0.0", \
+     "--browser.serverPort", "8080", \
+     "--browser.gatherUsageStats", "false", \
+     "--server.port", "8080"]
