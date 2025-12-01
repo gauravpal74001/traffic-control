@@ -170,7 +170,7 @@ def play_youtube_video(conf, model, language):
                         if stream is None:
                             stream = yt.streams.filter(file_extension="mp4").first()
                     
-                    # Last resort: get highest resolution available
+                    # Last resort: get highest resolution availab
                     if stream is None:
                         all_streams = yt.streams.filter(file_extension="mp4")
                         if len(all_streams) > 0:
@@ -677,46 +677,177 @@ def junctionEvaluationDataset(language: str):
             jxnEvalInstance = JunctionEvaluation(source_path)
             returnPath = jxnEvalInstance.datasetCreation(cycle=cycle)
             st.sidebar.write(COMPONENTS[language]["SUCCESS_DATA"]+returnPath)
-                  
-# def junctionEvaluation(language):
-#     if (len(settings.EVALUATION_DICT.keys()) == 0):
-#         st.sidebar.error(COMPONENTS[language]["DATASET_NOT_THERE"])
-#     else:
-#         source_dir = st.sidebar.selectbox(
-#         COMPONENTS[language]["CHOOSE_FOLDER"], settings.EVALUATION_DICT.keys())
-        
-#         source_path = str(settings.EVALUATION_DICT.get(source_dir))
-#         source_vid = st.sidebar.selectbox(
-#         COMPONENTS[language]["CHOOSE_VID"], settings.FINAL_DICT[source_dir].keys())
-        
-        
-#         with open("videos/JunctionEvalDataset/"+source_dir+"/"+source_vid, 'rb') as video_file:
-#             video_bytes = video_file.read()
-#         if video_bytes:
-#             st.video(video_bytes)
 
-#         threshold = st.sidebar.text_input(
-#             COMPONENTS[language]["INTEGER_RANGE"]
-#         )
-
-#         try:
+def calculateWholeJunction(finalDict):
+    """
+    Counts the total number of unique vehicles per class based on the finalDict.
+    """
+    summary_table = {}
+    
+    # Iterate through every unique tracked object
+    for tracker_id, instance in finalDict.items():
+        # In your cleaningDataset function, instance.classId becomes an integer (e.g., 2 for car)
+        class_id = instance.classId
+        
+        if class_id in summary_table:
+            summary_table[class_id] += 1
+        else:
+            summary_table[class_id] = 1
             
-#             threshold = int(threshold)
-#             if (threshold > 5 or threshold < 1):
-#                 st.sidebar.error(COMPONENTS[language]["VALID_VALUE"])
-#             else:
-#                 if st.sidebar.button(COMPONENTS[language]["EVALUATION"]):
-#                     returnVid = "videos/JunctionEvaluations/IndiraNagarClips/clip1.mp4"
-#                     with open(returnVid, 'rb') as video_file2:
-#                         video_bytes2 = video_file2.read()
-                        
-#                     if video_bytes2:
-#                         st.video(video_bytes2)
-                    
-                                                            
-#         except:
-#             st.sidebar.error(COMPONENTS[language]["VALID_VALUE"])            
+    return summary_table  
+                  
+def junctionEvaluation(model, language):
+    # 1. Initialize Session State for Navigation
+    if ("current_dir_path" not in st.session_state):
+        st.session_state.current_dir_path = VIDEO_DIR_PATH
 
+    # st.text(st.session_state.current_dir_path) # Optional debug text
+
+    if ("current_state" not in st.session_state):
+        st.session_state.current_state = "homePage"
+
+    # 2. STATE: Home Page (Video Gallery)
+    if (st.session_state.current_state=="homePage"):
+        isVideo = False
+        if (st.session_state.current_dir_path.endswith(('.mp4', '.avi','.mov','.AVI'))):
+            isVideo = True
+            st.session_state.current_state = "checkingDetections"
+            st.rerun()
+        else:
+            st.title("Video Gallery")
+
+        video_files = [f for f in os.listdir(st.session_state.current_dir_path) if f.endswith(('.mp4', '.avi','.mov','.AVI'))]
+        folders = [f for f in os.listdir(st.session_state.current_dir_path) if '.' not in f]
+        
+        # Display videos in a grid
+        cols = st.columns(3)
+        video_files = folders + video_files
+        
+        # Back Button Logic
+        if (st.session_state.current_dir_path != VIDEO_DIR_PATH):
+            if (st.button("Back")):
+                # Go up one directory level
+                st.session_state.current_dir_path = st.session_state.current_dir_path[:st.session_state.current_dir_path.rfind("/")]
+                st.session_state.current_dir_path = st.session_state.current_dir_path[:st.session_state.current_dir_path.rfind("/")+1]
+                st.rerun()
+
+        # Render Folders and Videos
+        for idx, video_file in enumerate(video_files):
+            with cols[idx % 3]:
+                video_path = os.path.join(st.session_state.current_dir_path, video_file)
+                
+                # Check if it's a folder
+                if (idx < len(folders)):
+                    # Use a default folder icon if available, or just text
+                    if os.path.exists(IMAGES_DIR_PATH+"/FolderIcon.png"):
+                        first_frame = Image.open(IMAGES_DIR_PATH+"/FolderIcon.png")
+                        first_frame = first_frame.resize(CARD_IMAGE_SIZE, Image.LANCZOS)
+                        st.image(first_frame, use_column_width=True)
+                    else:
+                        st.info("📁") # Fallback icon
+                    
+                    st.write(video_file)
+                    if st.button(f"Navigate to {video_file}", key=video_file):
+                        st.session_state.current_dir_path = st.session_state.current_dir_path + video_file + "/"
+                        st.rerun()
+                        
+                # It is a video file
+                else:
+                    first_frame = get_first_frame(video_path)
+                    if first_frame:
+                        st.image(first_frame, use_column_width=True)
+                        st.write(video_file)
+                        if st.button(f"Analyze {video_file}", key=video_file):
+                            st.session_state.current_dir_path = st.session_state.current_dir_path + video_file
+                            st.rerun()
+
+    # 3. STATE: Checking Detections
+    if (st.session_state.current_state == "checkingDetections"):
+        col1, col2 = st.columns([3,1])
+        with col1:
+            st.title("Analysis: " + st.session_state.current_dir_path.split("/")[-1])
+        with col2:
+            if (st.button("Back to video gallery")):
+                st.session_state.current_dir_path = st.session_state.current_dir_path[:st.session_state.current_dir_path.rfind('/')+1]
+                st.session_state.current_state = "homePage"
+                st.rerun()
+        
+        detections_path, exists, detections = loadDetections(st.session_state.current_dir_path)
+        
+        if (not exists):
+            st.subheader("Detections not found!")
+            if (st.button("Obtain and save detections")):
+                with st.spinner("Running Object Detection... This may take a while."):
+                    detections = get_detections(st.session_state.current_dir_path)
+                    saveDetections(detections=detections, filename=detections_path)
+                st.success("Detections saved!")
+                st.rerun()
+        else:
+            st.session_state.current_state = "DetectionsFound"
+            st.rerun()
+    
+    # 4. STATE: Detections Found (Menu)
+    if (st.session_state.current_state == "DetectionsFound"):
+        st.subheader("Detections found!")
+        if (st.button("Back to video gallery")):
+            st.session_state.current_dir_path = st.session_state.current_dir_path[:st.session_state.current_dir_path.rfind('/')+1]
+            st.session_state.current_state = "homePage"
+            st.rerun()
+            
+        col1, col2 = st.columns([1,1])
+        with col1:
+            if (st.button("Analyze whole junction")):
+                st.session_state.current_state = "analyzeWholeJxn" 
+                st.rerun()     
+        with col2:
+            if (st.button("✨ Roadwise Analysis (BETA)")): 
+                st.session_state.current_state = "roadwiseanalysis"
+                st.rerun()
+
+    # 5. STATE: Settings for Analysis
+    if (st.session_state.current_state == "analyzeWholeJxn"):
+        if (st.button("Back to video gallery")):
+            st.session_state.current_dir_path = st.session_state.current_dir_path[:st.session_state.current_dir_path.rfind('/')+1]
+            st.session_state.current_state = "homePage"
+            st.rerun()
+            
+        col1,col2 = st.columns([3,1])
+        with col1:
+            frameThreshold = st.slider("Frame Threshold", min_value=10, max_value=50, value=24)
+            st.session_state.frameThreshold = frameThreshold
+        with col2:
+            if (st.button("Detect")):
+                st.session_state.current_state = "wholeJunction"
+                detections_path, exists, detections = loadDetections(st.session_state.current_dir_path)
+                
+                # Make sure cleaningDataset is defined or imported!
+                finalDict = cleaningDataset(detections=detections, frameThreshold=st.session_state.frameThreshold)
+                st.session_state.finalDict = finalDict
+                st.session_state.current_state = "analysis"
+                st.rerun()    
+        st.subheader("Any vehicle detected in < frameThreshold frames would not be considered in final analysis")
+
+    # 6. STATE: Final Analysis Table
+    if (st.session_state.current_state == "analysis"):
+        if (st.button("Back to video gallery")):
+            st.session_state.current_dir_path = st.session_state.current_dir_path[:st.session_state.current_dir_path.rfind('/')+1]
+            st.session_state.current_state = "homePage"
+            st.rerun()
+            
+        # Ensure calculateWholeJunction is defined in helper.py
+        table = calculateWholeJunction(st.session_state.finalDict)
+        
+        newTable = {}
+        for i in table.keys():
+            # THIS IS WHERE 'model' IS USED
+            class_name = model.model.names[i]
+            newTable[class_name] = table[i]
+            
+        df = pandas.DataFrame.from_dict(newTable, orient='index', columns=['Value'])
+        st.title('Number of vehicles detected in given clip')
+        st.table(df)
+       
+        
 def benchMarking(confidence: float, language:str):
     
     global CURRENT_DIR_PATH

@@ -125,7 +125,7 @@ if LOGGED_IN == True:
         helper.junctionEvaluationDataset(language_dict[language])
         
     elif source_radio == COMPONENTS[language_dict[language]]["JUNCTIONEVAL"]:
-        helper.junctionEvaluation(language_dict[language])
+        helper.junctionEvaluation(model, language_dict[language])
         
     elif source_radio == COMPONENTS[language_dict[language]]["BENCHMARKING"]:
         helper.benchMarking(confidence,language_dict[language])
